@@ -1,0 +1,57 @@
+@{
+    var message = TempData["CaseMessage"] as string;
+    var failed = Convert.ToString(TempData["CaseFailed"]) == "True";
+    var reopenId = Convert.ToString(TempData["CaseReopenId"]);
+    var draft = Convert.ToString(TempData["CaseNoteDraft"]);
+}
+<div style="margin:1rem 0;">
+  @if (!string.IsNullOrEmpty(message))
+  {
+    <p role="alert">@message</p>
+  }
+  @if (failed && !string.IsNullOrEmpty(draft))
+  {
+    <details><summary>Salinan catatan belum tersimpan (ID @reopenId)</summary><p style="white-space:pre-wrap;">@draft</p></details>
+  }
+  <button type="button" id="history-refresh" class="btn-secondary">Perbarui riwayat</button>
+  <span id="history-refresh-status" role="status">Riwayat diperbarui setiap 15 detik saat tidak ada detail/draf terbuka.</span>
+</div>
+<script>
+(function () {
+  var busy = false, stopped = false;
+  var status = document.getElementById('history-refresh-status');
+  function editing() {
+    return Array.prototype.some.call(document.querySelectorAll('#history-modals .modal-overlay'), function (modal) {
+      return window.getComputedStyle(modal).display !== 'none';
+    }) || Array.prototype.some.call(document.querySelectorAll('#history-modals input:not([type="hidden"]), #history-modals textarea'), function (input) {
+      return input.value !== input.defaultValue || input.value.trim() !== '';
+    });
+  }
+  async function refresh() {
+    if (busy || stopped || document.hidden) return;
+    if (editing()) { status.textContent = 'Pembaruan ditunda agar detail dan draf tetap tersimpan.'; return; }
+    busy = true;
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); }, 12000);
+    try {
+      var response = await fetch(window.location.href, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+      if (!response.ok || response.redirected) throw new Error('refresh');
+      var page = new DOMParser().parseFromString(await response.text(), 'text/html');
+      var selectors = ['#history-list', '#history-modals'];
+      if (document.getElementById('history-counts')) selectors.push('#history-counts');
+      if (!selectors.every(function (selector) { return page.querySelector(selector); })) throw new Error('session');
+      if (stopped || document.hidden || editing()) return;
+      selectors.forEach(function (selector) {
+        document.querySelector(selector).replaceWith(page.querySelector(selector));
+      });
+      status.textContent = 'Riwayat diperbarui ' + new Date().toLocaleTimeString('id-ID');
+    } catch (error) {
+      status.textContent = 'Riwayat belum diperbarui. Periksa koneksi/sesi; data lama tetap ditampilkan.';
+    } finally { clearTimeout(timeout); busy = false; }
+  }
+  document.getElementById('history-refresh').onclick = refresh;
+  var timer = setInterval(refresh, 15000);
+  window.addEventListener('pagehide', function () { stopped = true; clearInterval(timer); });
+  window.addEventListener('pageshow', function (event) { if (event.persisted) { stopped = false; timer = setInterval(refresh, 15000); } });
+})();
+</script>

@@ -1,0 +1,7 @@
+# Reuse installed Torch/OpenCV without changing the production backend image.
+FROM fs-smartcctv-pep-backend:latest
+WORKDIR /app
+RUN pip install --no-cache-dir transformers==4.57.6 safetensors==0.6.2 PyYAML==6.0.2
+COPY app ./app
+ENV PYTHONDONTWRITEBYTECODE=1 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+CMD ["uvicorn", "app.demo_live.main:app", "--host", "0.0.0.0", "--port", "8010"]

@@ -1,0 +1,157 @@
+@model MvcSmartCctv.Models.RetentionViewModel
+@if (!(bool)ViewBag.IsAdmin)
+{
+  <div class="restricted">
+    <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+    <h2>Akses Terbatas</h2>
+    <p>Halaman Pengaturan hanya bisa diakses oleh role <strong>Admin</strong>. Hubungi Admin Platform kalau kamu butuh perubahan daftar kamera.</p>
+  </div>
+}
+else
+{
+  <div class="page-head"><h2>Pengaturan</h2></div>
+
+  <section class="panel" aria-labelledby="retention-title" style="margin-bottom:1.5rem;">
+    <div class="panel-head"><h2 id="retention-title">Retensi Data Pelanggaran</h2></div>
+    <div style="padding:1rem;">
+      @if (!string.IsNullOrEmpty(Model.Notice))
+      {
+        <p role="status">@Model.Notice</p>
+      }
+      @if (!string.IsNullOrEmpty(Model.Error))
+      {
+        <p role="alert" style="color:var(--critical);">@Model.Error</p>
+      }
+      <p>Simpan N data pelanggaran terbaru secara global (APD dan kendaraan). Kasus terbuka selalu dilindungi, sehingga total data dapat melebihi N. Retensi awal nonaktif dengan batas 1000 data.</p>
+      <p>Pembersihan menghapus permanen data tertua di luar batas, catatan terkait, dan snapshot yang tidak digunakan data lain. Proses berjalan bertahap di latar belakang, bukan langsung saat menyimpan. Kunci sumber kecil tetap disimpan untuk mencegah data terhapus masuk kembali.</p>
+      @if (Model.Summary != null)
+      {
+        <dl>
+          <dt>Status tersimpan</dt><dd>@(Model.Summary.enabled ? "Aktif" : "Nonaktif") — batas @Model.Summary.max_records.ToString("N0") data</dd>
+          <dt>Total data (termasuk kasus dilindungi)</dt><dd>@Model.Summary.total_records.ToString("N0")</dd>
+          <dt>Kasus terbuka dilindungi</dt><dd>@Model.Summary.protected_open_cases.ToString("N0")</dd>
+          <dt>Data memenuhi syarat penghapusan</dt><dd>@Model.Summary.eligible_for_deletion.ToString("N0")</dd>
+          <dt>Berkas menunggu penghapusan</dt><dd>@Model.Summary.pending_file_deletions.ToString("N0")</dd>
+          <dt>Pembersihan terakhir</dt><dd>@(string.IsNullOrEmpty(Model.Summary.last_run_at) ? "Belum berjalan" : Model.Summary.last_run_at)</dd>
+          <dt>Kesehatan pembersihan</dt><dd>@(string.IsNullOrEmpty(Model.Summary.last_error) ? "Tidak ada galat yang dilaporkan" : Model.Summary.last_error)</dd>
+        </dl>
+      }
+      else
+      {
+        <p>Status retensi belum tersedia. Nilai formulir bukan konfirmasi pengaturan tersimpan.</p>
+      }
+      <p><a href="@Url.Action("Index", "Settings")">Muat ulang status / batalkan pratinjau</a></p>
+      @if (Model.Preview == null)
+      {
+        using (Html.BeginForm("PreviewRetention", "Settings", FormMethod.Post))
+        {
+          @Html.AntiForgeryToken()
+          <div class="field">
+            <label for="retention-enabled"><input id="retention-enabled" type="checkbox" style="width:auto;" name="enabled" value="true" @(Model.Enabled ? "checked" : "") /> Aktifkan retensi otomatis</label>
+          </div>
+          <div class="field">
+            <label for="retention-max">Jumlah data terbaru yang disimpan (N)</label>
+            <input id="retention-max" type="number" name="maxRecords" min="1" max="1000000" step="1" required value="@Model.MaxRecords" aria-describedby="retention-limit-help" />
+            <div id="retention-limit-help" class="hint">1–1000000. Kasus terbuka tidak dihapus, termasuk yang berada di luar N terbaru.</div>
+          </div>
+          <button type="submit" class="btn-primary">Pratinjau Perubahan</button>
+          <p class="hint">Pratinjau tidak menyimpan pengaturan atau menghapus data.</p>
+        }
+      }
+      else
+      {
+        <h3>Konfirmasi Perubahan Retensi</h3>
+        <p>Status yang akan disimpan: <strong>@(Model.Preview.enabled ? "Aktif" : "Nonaktif")</strong>. Batas: <strong>@Model.Preview.max_records.ToString("N0")</strong> data terbaru.</p>
+        <p>Pratinjau: @Model.Preview.total_records.ToString("N0") total data, @Model.Preview.protected_open_cases.ToString("N0") kasus terbuka dilindungi, @Model.Preview.eligible_for_deletion.ToString("N0") data memenuhi syarat penghapusan. Jumlah aktual dapat berubah saat data baru masuk atau status kasus berubah.</p>
+        if (!Model.Preview.enabled)
+        {
+          <p>Retensi akan dinonaktifkan. Penghapusan berkas yang sudah dijadwalkan dapat tetap diselesaikan.</p>
+        }
+        using (Html.BeginForm("SaveRetention", "Settings", FormMethod.Post))
+        {
+          @Html.AntiForgeryToken()
+          <input type="hidden" name="enabled" value="@(Model.Preview.enabled ? "true" : "false")" />
+          <input type="hidden" name="maxRecords" value="@Model.Preview.max_records" />
+          <input type="hidden" name="previewToken" value="@Model.Preview.preview_token" />
+          <input type="hidden" name="version" value="@Model.Preview.version" />
+          <div class="field">
+            <label for="retention-confirm"><input id="retention-confirm" type="checkbox" style="width:auto;" name="confirmed" value="true" required /> Saya mengonfirmasi perubahan ini dan memahami bahwa retensi aktif akan menghapus permanen data tertua di luar batas, catatan terkait, serta snapshot yang tidak digunakan data lain. Penghapusan tidak dapat dibatalkan. Kasus terbuka tetap dilindungi.</label>
+          </div>
+          <button type="submit" class="btn-primary">Konfirmasi dan Simpan</button>
+        }
+      }
+    </div>
+  </section>
+
+  if (!string.IsNullOrEmpty(Model.CameraError))
+  {
+    <p role="alert">@Model.CameraError</p>
+  }
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Kelola Kamera</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nama</th><th>IP</th><th>Lokasi</th><th>Kategori</th><th>Stream</th><th></th></tr></thead>
+        <tbody>
+        @if (!Model.Cameras.Any())
+        {
+          <tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Belum ada kamera</td></tr>
+        }
+        else
+        {
+        foreach (var c in Model.Cameras)
+        {
+          <tr class="row-click" style="cursor:pointer;" onclick="document.getElementById('cam-modal-@c.Id').style.display='flex';">
+            <td>@c.Name</td>
+            <td class="mono">@c.IpAddress</td>
+            <td>@(c.Location ?? "-")</td>
+            <td>@(c.Category == "vehicle" ? "Vehicle Violation" : "APD Detection")</td>
+            <td><span class="badge @(string.IsNullOrEmpty(c.StreamPath) ? "muted" : "success")">@(string.IsNullOrEmpty(c.StreamPath) ? "Belum ada" : "Live")</span></td>
+            <td onclick="event.stopPropagation()"><button class="link-btn" onclick="document.getElementById('cam-modal-@c.Id').style.display='flex';">Edit</button></td>
+          </tr>
+        }
+        }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  foreach (var c in Model.Cameras)
+  {
+    <div class="modal-overlay" id="cam-modal-@c.Id" style="display:none;" onclick="if(event.target.id==='cam-modal-@c.Id')this.style.display='none';">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>Edit — @c.Name</h3>
+          <button class="modal-close" onclick="document.getElementById('cam-modal-@c.Id').style.display='none';">&times;</button>
+        </div>
+        <form onsubmit="return false;">
+          <div class="modal-body">
+            <div class="field"><label>Nama Kamera</label><input type="text" value="@c.Name" disabled /></div>
+            <div class="field"><label>Lokasi</label><input type="text" value="@c.Location" disabled /></div>
+            <div class="field">
+              <label>Kategori Deteksi</label>
+              <select disabled>
+                <option @(c.Category == "apd" ? "selected" : "")>APD Detection</option>
+                <option @(c.Category == "vehicle" ? "selected" : "")>Vehicle Violation</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>RTSP URL (opsional)</label>
+              <input type="text" value="" disabled placeholder="rtsp://user:pass&#64;192.168.56.110:554/stream1" />
+              <div class="hint">Mockup — manajemen kamera tidak tersambung ke backend nyata pada tampilan ini.</div>
+            </div>
+          </div>
+          <div class="modal-actions" style="justify-content:space-between;">
+            <button type="button" class="link-btn" style="color:var(--critical);" disabled title="Mockup — tidak ada backend nyata">Hapus Kamera</button>
+            <div style="display:flex;gap:0.6rem;">
+              <button type="button" class="btn-secondary" onclick="document.getElementById('cam-modal-@c.Id').style.display='none';">Batal</button>
+              <button type="submit" class="btn-primary" disabled title="Mockup — tidak ada backend nyata">Simpan Perubahan</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+}

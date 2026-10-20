@@ -1,0 +1,160 @@
+@using System.Linq
+@model System.Collections.Generic.List<MvcSmartCctv.Models.PlatformUser>
+@{
+    // Standalone layout — no shared shell/_Layout (see admin.html + AdminController).
+    Layout = null;
+    var shell = ViewBag.Shell as MvcSmartCctv.Models.ShellViewModel ?? new MvcSmartCctv.Models.ShellViewModel();
+    Func<string, string> initials = name => {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(' ');
+        var sb = new System.Text.StringBuilder();
+        foreach (var p in parts) { if (p.Length > 0 && sb.Length < 2) sb.Append(char.ToUpper(p[0])); }
+        return sb.ToString();
+    };
+    var roleBadge = new System.Collections.Generic.Dictionary<string, string> { { "admin", "warning" }, { "supervisor", "success" }, { "operator", "muted" } };
+}
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Smart CCTV AI — Admin Dashboard</title>
+<link rel="icon" href="@Url.Content("~/Content/pertamina-ep-logo.jpg")" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="@Url.Content("~/Content/styles.css")">
+<style>
+  .denied{ max-width:480px; margin:4rem auto; text-align:center; }
+  .denied h2{ font-size:1.2rem; margin-bottom:0.5rem; }
+  .denied p{ color:var(--text-muted); margin-bottom:1.2rem; }
+  .role-select{
+    width:100%; padding:0.5rem 0.65rem; border:1px solid var(--border); border-radius:7px;
+    background:var(--bg); color:var(--text); font-size:0.9rem;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="@Url.Content("~/Content/pertamina-ep-logo.jpg")" alt="Pertamina EP" />
+    <div class="divider"></div>
+    <div>
+      <h1>Smart CCTV AI <span class="portal-pill admin">Admin</span></h1>
+      <div class="sub">Manajemen User Platform</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <a class="link-btn" href="@Url.Action("Index", "Home")">Kembali ke Dashboard</a>
+    <div class="user-chip">
+      <div class="avatar">@initials(shell.UserName)</div>
+      <span class="name">@shell.UserName</span>
+      @using (Html.BeginForm("Logout", "Account", FormMethod.Post, new { style = "display:inline;" }))
+      {
+        <button type="submit" class="logout-btn">Keluar</button>
+      }
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="panel-head">
+      <h2>User Platform</h2>
+      <button class="action-btn" onclick="document.getElementById('addUserModal').hidden=false;">+ Tambah User</button>
+    </div>
+    <div class="panel-body table-wrap">
+      <table>
+        <thead>
+          <tr><th>Username</th><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+        @if (!Model.Any())
+        {
+          <tr><td colspan="6" style="text-align:center;color:var(--text-muted);">Belum ada user</td></tr>
+        }
+        else
+        {
+        foreach (var u in Model)
+        {
+          var roleBadges = string.Join(" ", u.Roles.Where(roleBadge.ContainsKey).Select(r => "<span class=\"badge " + roleBadge[r] + "\">" + r + "</span>"));
+          <tr>
+            <td class="mono">@u.Username</td>
+            <td>@(string.Join(" ", new[] { u.FirstName, u.LastName }.Where(s => !string.IsNullOrEmpty(s))))</td>
+            <td>@(u.Email ?? "-")</td>
+            <td>@Html.Raw(string.IsNullOrEmpty(roleBadges) ? "-" : roleBadges)</td>
+            <td>@if (u.Enabled) { <span class="badge success">Aktif</span> } else { <span class="badge muted">Nonaktif</span> }</td>
+            <td>
+            @using (Html.BeginForm("ToggleUser", "Admin", FormMethod.Post, new { style = "display:inline;" }))
+            {
+              <input type="hidden" name="id" value="@u.Id" />
+              <button type="submit" class="link-btn">@(u.Enabled ? "Nonaktifkan" : "Aktifkan")</button>
+            }
+            </td>
+          </tr>
+        }
+        }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Smart CCTV AI &middot; Pertamina EP &middot; Admin Dashboard — user yang dibuat di sini langsung terdaftar di Keycloak realm <span class="mono">smart-cctv-ai</span></footer>
+</main>
+
+<div class="modal-overlay" id="addUserModal" hidden="@(TempData["AddUserError"] == null)">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Tambah User</h3>
+      <button class="modal-close" onclick="document.getElementById('addUserModal').hidden=true;">&times;</button>
+    </div>
+    @using (Html.BeginForm("AddUser", "Admin", FormMethod.Post))
+    {
+      <div class="modal-body">
+        @if (TempData["AddUserError"] != null)
+        {
+          <div class="form-error show">@TempData["AddUserError"]</div>
+        }
+        <div class="field">
+          <label>Username</label>
+          <input type="text" name="username" placeholder="mis. operator2" />
+        </div>
+        <div class="field">
+          <label>Nama Depan</label>
+          <input type="text" name="firstName" placeholder="mis. Budi" />
+        </div>
+        <div class="field">
+          <label>Nama Belakang</label>
+          <input type="text" name="lastName" placeholder="mis. Santoso" />
+        </div>
+        <div class="field">
+          <label>Email</label>
+          <input type="email" name="email" placeholder="budi.santoso@pertamina-ep.local" />
+        </div>
+        <div class="field">
+          <label>Role</label>
+          <select class="role-select" name="role">
+            <option value="operator">Operator — memantau &amp; acknowledge pelanggaran</option>
+            <option value="supervisor">Supervisor — assign &amp; menutup kasus</option>
+            <option value="admin">Admin — kelola user &amp; pengaturan sistem</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Password Awal</label>
+          <input type="password" name="password" placeholder="Password awal wajib diisi" required="required" autocomplete="new-password" />
+        </div>
+        <div class="field checkbox-row">
+          <input type="checkbox" checked disabled />
+          <label>Wajib ganti password saat login pertama</label>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="document.getElementById('addUserModal').hidden=true;">Batal</button>
+        <button type="submit" class="btn-primary">Buat User</button>
+      </div>
+    }
+  </div>
+</div>
+
+</body>
+</html>

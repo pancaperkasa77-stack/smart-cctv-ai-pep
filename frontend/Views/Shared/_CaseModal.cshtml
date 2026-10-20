@@ -1,0 +1,98 @@
+@model MvcSmartCctv.Models.Violation
+@{
+    var reopen = Convert.ToString(TempData.Peek("CaseReopenId")) == Model.Id.ToString();
+    var noteDraft = reopen ? Convert.ToString(TempData.Peek("CaseNoteDraft")) : "";
+    var categoryLabel = Model.Category == "vehicle" ? "Vehicle Violation" : "APD Detection";
+    var statusLabel = new System.Collections.Generic.Dictionary<string, string> { { "baru", "Baru" }, { "diproses", "Diproses" }, { "selesai", "Selesai" } };
+}
+<div class="modal-overlay" id="case-modal-@Model.Id" style="display:@(reopen ? "flex" : "none");" onclick="if(event.target.id==='case-modal-@Model.Id')this.style.display='none';">
+  <div class="modal wide">
+    <div class="modal-head">
+      <div>
+        <h3>@(Model.IsCase ? "Detail Kasus — CASE-" + Model.Id.ToString("D4") : "Detail Alert")</h3>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-top:0.15rem;">@Model.Label</div>
+      </div>
+      <button class="modal-close" onclick="document.getElementById('case-modal-@Model.Id').style.display='none';">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="snapshot-box">
+        @if (Model.HasSnapshot && !string.IsNullOrWhiteSpace(Model.SnapshotPath))
+        {
+          <img src="@Url.Action("Image", "Snapshots", new { filename = Model.SnapshotPath })" alt="Bukti Pelanggaran" style="width:100%;height:auto;max-height:280px;object-fit:contain;border-radius:6px;background:#000;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';" />
+          <div class="placeholder" style="display:none;"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l4-3h6l2 3h4a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.2"/></svg><span style="font-size:0.76rem;color:var(--text-muted);">Foto bukti tidak tersedia</span></div>
+        }
+        else
+        {
+          <div class="placeholder"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l4-3h6l2 3h4a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.2"/></svg><span style="font-size:0.76rem;color:var(--text-muted);">Tidak ada snapshot</span></div>
+        }
+      </div>
+      <div class="detail-grid">
+        <div><div class="k">Kategori</div><div class="v">@categoryLabel</div></div>
+        <div><div class="k">Kamera</div><div class="v">@Model.CameraName</div></div>
+        <div><div class="k">Waktu Deteksi</div><div class="v">@Model.CreatedAt.ToString("dd MMM yyyy, HH:mm")</div></div>
+      </div>
+      @if (!Model.IsCase)
+      {
+        <div style="display:flex; justify-content:flex-end;">
+          @using (Html.BeginForm("Promote", "Cases", FormMethod.Post))
+          {
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+            <input type="hidden" name="redirectUrl" value="@Request.RawUrl" />
+            <button type="submit" class="btn-primary">Jadikan Kasus Investigasi</button>
+          }
+        </div>
+      }
+      else
+      {
+        <div style="margin-bottom:1.25rem;">
+          <div style="font-size:0.78rem;font-weight:600;margin-bottom:0.5rem;">Status Penanganan</div>
+          <div class="status-stepper">
+            @foreach (var s in new[] { "baru", "diproses", "selesai" })
+            {
+              using (Html.BeginForm("UpdateStatus", "Cases", FormMethod.Post, new { style = "display:inline;" }))
+              {
+                @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+                <input type="hidden" name="status" value="@s" />
+                <input type="hidden" name="redirectUrl" value="@Request.RawUrl" />
+                <button type="submit" class="status-step@(Model.Status == s ? " active-" + s : "")">@statusLabel[s]</button>
+              }
+            }
+          </div>
+        </div>
+        <div style="margin-bottom:1.25rem;">
+          <label style="display:block;font-size:0.78rem;font-weight:600;margin-bottom:0.4rem;">Ditugaskan ke</label>
+          <div class="readonly-note">@(Model.AssignedTo ?? "Belum ditugaskan")</div>
+        </div>
+        <div style="margin-bottom:1.25rem;">
+          <div style="font-size:0.78rem;font-weight:600;margin-bottom:0.5rem;">Catatan Investigasi</div>
+          @if (Model.Notes.Count > 0)
+          {
+            <div class="notes-list">
+              @foreach (var n in Model.Notes)
+              {
+                <div class="note-item">
+                  <div class="author">@n.Author <span class="time">&middot; @n.CreatedAt.ToString("dd MMM yyyy, HH:mm")</span></div>
+                  <div class="text">@n.Text</div>
+                </div>
+              }
+            </div>
+          }
+          else
+          {
+            <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:0.5rem;">Belum ada catatan.</div>
+          }
+          @using (Html.BeginForm("AddNote", "Cases", FormMethod.Post, new { @class = "note-form" }))
+          {
+            @Html.AntiForgeryToken()
+            <input type="hidden" name="id" value="@Model.Id" />
+            <input type="hidden" name="redirectUrl" value="@Request.RawUrl" />
+            <input type="text" name="text" value="@noteDraft" placeholder="Tambah catatan investigasi..." required="required" />
+            <button type="submit" class="btn-primary">Kirim</button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

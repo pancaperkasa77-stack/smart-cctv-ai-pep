@@ -1,0 +1,79 @@
+################################################################
+# Konfigurasi AI Engine — Smart CCTV AI
+#
+# File ini dibaca oleh stream_worker.py dan detector.py.
+# APD: weights/apd/ (RT-DETRv2). Vehicle: weights/vehicle/ + kalibrasi.
+################################################################
+
+inference:
+  # Cooldown vehicle per kamera; APD memakai deduplikasi per track/item.
+  # Threshold dan cadence diatur terpisah pada blok apd/vehicle.
+  cooldown_seconds: 30
+
+cameras:
+  # Konfigurasi kamera APD
+  - camera_id: 1
+    model: apd            # menggunakan weights/apd/model.safetensors
+    rtsp_url: "rtsp://admin:password@192.168.56.101:554/stream1"
+    enabled: true
+
+  - camera_id: 2
+    model: apd
+    rtsp_url: "rtsp://admin:password@192.168.56.102:554/stream1"
+    enabled: true
+
+  - camera_id: 3
+    model: apd
+    rtsp_url: null        # Kamera belum memiliki stream RTSP
+    enabled: false
+
+  # Konfigurasi kamera Vehicle
+  - camera_id: 4
+    model: vehicle        # RT-DETRv2 + evidence/pose, weights/vehicle/
+    vehicle_profile: null # Wajib diisi profil kalibrasi kamera ini sebelum aktif
+    rtsp_url: "rtsp://admin:password@192.168.56.104:554/stream1"
+    enabled: true
+
+  - camera_id: 5
+    model: vehicle
+    vehicle_profile: null
+    rtsp_url: "rtsp://admin:password@192.168.56.105:554/stream1"
+    enabled: true
+
+# APD RT-DETRv2: status per orang/PPE setelah association, voting, dan gate.
+# Tidak ada kelas masker/rompi; coverall berarti wearpack, bukan rompi.
+apd:
+  sample_interval_seconds: 1.0
+  cpu_threads: 4
+  gerbang_pekerja: coverall  # coverall | coverall_helm | mati
+  exempt_uniform: true
+  conf_person: 0.09
+  conf_ppe: 0.09
+  conf_per_class:
+    boot_present: 0.07
+  vote_window: 15
+  vote_min: 2
+  vote_on: 0.6
+  vote_off: 0.3
+  violation_min_hits: 3
+  reset_gap_seconds: 30
+  max_tracks: 256
+  max_memory_tracks: 2048
+
+# Vehicle menghasilkan keputusan rule, bukan pemetaan class_id COCO.
+vehicle:
+  sample_interval_seconds: 1.0
+  window_seconds: 60
+  max_records: 120
+  max_frame_bytes: 268435456  # 256 MiB per kamera; window penuh harus muat
+  cpu_threads: 4
+  # Profil tidak boleh dipinjam dari kamera lain. Tinggi orang berdiri:
+  # max(10, a * y_bottom + b), dalam pixel pada resolution yang tepat.
+  # profiles:
+  #   kamera_terkalibrasi:
+  #     resolution: [1920, 1080]
+  #     a: <hasil kalibrasi>
+  #     b: <hasil kalibrasi>
+  #     vehicle_masks: []
+  #     ignore_zones: []
+  profiles: {}

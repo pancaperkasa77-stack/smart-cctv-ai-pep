@@ -1,0 +1,51 @@
+###############################################################
+# MediaMTX — RTSP to WebRTC/HLS/RTSP Media Gateway
+# Dokumentasi lengkap: https://github.com/bluenviron/mediamtx
+###############################################################
+
+# API internal MediaMTX (untuk manajemen stream)
+api: yes
+apiAddress: :9997
+
+# ─────────────────────────────────────────────────────────────
+# Path / Stream Sources
+#
+# Format: setiap kamera didaftarkan sebagai satu path.
+# Backend FastAPI membaca `stream_path` dari database kamera,
+# lalu mengarahkan browser ke:
+#   WebRTC: http://localhost:8889/<stream_path>
+#   HLS   : http://localhost:8888/<stream_path>
+#
+# Ganti rtsp://... di bawah ini dengan URL RTSP kamera nyata.
+# Format umum: rtsp://user:password@IP_KAMERA:554/stream1
+# ─────────────────────────────────────────────────────────────
+paths:
+  cam1:
+    # RTSP source kamera CAM-01 Gerbang Utama
+    source: rtsp://admin:password@192.168.56.101:554/stream1
+    sourceOnDemand: yes     # Koneksi ke kamera hanya saat ada viewer
+    sourceOnDemandCloseAfter: 30s
+
+  cam2:
+    # RTSP source kamera CAM-02 Area Produksi A
+    source: rtsp://admin:password@192.168.56.102:554/stream1
+    sourceOnDemand: yes
+    sourceOnDemandCloseAfter: 30s
+
+  cam4:
+    # RTSP source kamera CAM-04 Pos Satpam
+    source: rtsp://admin:password@192.168.56.104:554/stream1
+    sourceOnDemand: yes
+    sourceOnDemandCloseAfter: 30s
+
+  cam5:
+    # RTSP source kamera CAM-05 Jalan Akses Tambang
+    source: rtsp://admin:password@192.168.56.105:554/stream1
+    sourceOnDemand: yes
+    sourceOnDemandCloseAfter: 30s
+
+  # Template untuk kamera baru — tambahkan sesuai kebutuhan
+  # cam6:
+  #   source: rtsp://user:pass@192.168.56.106:554/stream1
+  #   sourceOnDemand: yes
+  #   sourceOnDemandCloseAfter: 30s

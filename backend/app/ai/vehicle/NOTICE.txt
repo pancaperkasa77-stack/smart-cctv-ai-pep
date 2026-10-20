@@ -1,0 +1,42 @@
+Vehicle violation integration, adapted 2026-10-20.
+
+Source: user-provided vehicle_violation_20okt_v2.zip, directory
+vehicle_violation/src/vv/. Adaptation authorized by user for this application.
+Archive's LICENSE-APACHE-2.0.txt retained verbatim in this package. Original
+source documentation/comments retained. No additional copyright ownership or
+upstream licensing claim inferred beyond the supplied archive license.
+
+Adapted modules: config, detector, geometry, masks, rules, motion, evidence,
+openbed, pose, classifier, evaluate. New live adapter: pipeline.py, __init__.py.
+Original rule thresholds and geometry/motion/evidence/open-bed hooks retained.
+Offline evaluation/report/source-video reopening and persistent disk feature/
+pose caches removed. Evaluation now requires camera-local memory providers.
+Open-bed/pose failures propagate, never silently bypass mandatory checks.
+Neural models load local safetensors only; initialization/inference serialized.
+No archive scripts, training tools, exports or pickle model loaders executed.
+
+Finite-window adaptation is not full-recording equivalence. Records/frames
+bounded to at most 60 seconds, 120 records, 256 MiB frame bytes. Minimum 30 seconds
+history required before alarms. Startup or insufficient retained history means
+warming_up, not a verified negative result. Original 30-minute static-object
+probe unavailable in live window. Per-camera affine height calibration and
+pixel mask polygons require explicit configuration; original POS masks and
+calibrations never auto-applied based only on matching resolution. Classifier
+is disabled; its track_people implementation remains needed by evidence.
+
+Output policy: current-frame person voted BED, associated vehicle in_motion,
+positive n_bed. Indonesian display label 'Penumpang di bak kendaraan', critical.
+Confidence means person detector confidence, not calibrated violation certainty.
+
+Original archive module SHA-256 (before adaptation):
+config.py a249154c5be320beb76fc7a228a2f0f925f130c06bd8590167eb682eb4085b9f
+detector.py d735dd3034ece716c8b7583e7af2c8e12baaeadfc0e6b3df06657535f4ac69e6
+geometry.py 01f9c859c97c2ab32c7861bcf7d3cf07b8d80f2dff3f3504d8618cd4bccd7d31
+masks.py 65779e35b6d3576b740a1446d2559c46c46ec81a44017b9be49b938ae71d4f33
+rules.py 7566dad16361683b7bef3979eb60da81bb535c159d1c664ae13e1738cdf0c360
+motion.py dcbf10c238e0700ff0e900ec841d6205711fbee80a66cbcfefc38eac8176fcd0
+evidence.py f273d4be8097c738a354f6d61b4fecf84d9b2969170b67e9e2b9961bc5b48049
+openbed.py 1f32b15b793e9e83df8e33123aaf1f529b4c401fafaea2b48d2e739872f18ded
+pose.py 951bd5b27a2dd5f5e800dca3d51b301218803045238d8d8909f403dfb72ad482
+classifier.py 7147f046fc2a77f01ff01f9f6620e8e8268bce56d8febd67ecec4e1c4464ed9a
+evaluate.py 413a8b6f1ab165df4538e38417c76abf38165e183029e48aff25caea5a8e49fd

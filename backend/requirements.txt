@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Backend FastAPI — requirements.txt
+# Python 3.11+
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Web Framework & Server
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+
+# Data Validation
+pydantic==2.8.2
+pydantic-settings==2.4.0
+
+# Database — SQL Server
+sqlalchemy==2.0.35
+alembic==1.13.2
+pyodbc==5.1.0
+# Driver ODBC dipasang via apt di Dockerfile, bukan via pip
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.9
+
+# AI Inference — YOLO / PyTorch
+# CATATAN: torch & ultralytics cukup besar.
+# Jika server menggunakan GPU NVIDIA, ganti torch dengan versi CUDA:
+# torch==2.4.0+cu121 --index-url https://download.pytorch.org/whl/cu121
+ultralytics==8.3.0
+torch==2.4.1
+torchvision==0.19.1
+
+# Vehicle inference — RT-DETRv2 / ViTPose (local Safetensors only)
+transformers==4.57.6
+safetensors==0.6.2
+numpy==1.26.4
+scipy==1.14.1
+PyYAML==6.0.2
+
+# Video / RTSP Stream Reading
+opencv-python-headless==4.10.0.84
+
+# HTTP Client (untuk keperluan internal jika dibutuhkan)
+httpx==0.27.2
+
+# Utilities
+python-dotenv==1.0.1
+pillow==10.4.0

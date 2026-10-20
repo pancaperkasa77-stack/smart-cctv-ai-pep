@@ -1,0 +1,129 @@
+services:
+  # ─────────────────────────────────────────
+  # Microsoft SQL Server 2022
+  # ─────────────────────────────────────────
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: smartcctv_sqlserver
+    env_file: .env
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD}"
+      MSSQL_PID: "Developer"
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"${MSSQL_SA_PASSWORD}\" -C -Q 'SELECT 1' > /dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # FastAPI Backend (REST API + AI Engine)
+  # ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.api
+    image: fs-smartcctv-pep-api:latest
+    container_name: smartcctv_backend
+    env_file: .env
+    environment:
+      DATABASE_URL: "mssql+pyodbc://sa:${MSSQL_SA_PASSWORD}@sqlserver:1433/${MSSQL_DB}?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes"
+      SECRET_KEY: "${BACKEND_SECRET_KEY}"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "${BACKEND_ACCESS_TOKEN_EXPIRE_MINUTES}"
+      SNAPSHOT_DIR: "${SNAPSHOT_DIR}"
+      FRONTEND_ORIGIN: "${FRONTEND_ORIGIN}"
+      AI_WORKERS_ENABLED: "false"
+      DETECTION_INGEST_TOKEN: "${DETECTION_INGEST_TOKEN:?Set DETECTION_INGEST_TOKEN in .env}"
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Persistensi foto bukti pelanggaran
+      - snapshot_storage:/app/storage/snapshots
+      # Mount folder weights agar bisa update model .pt tanpa rebuild image
+      - ./backend/app/ai/weights:/app/app/ai/weights:ro
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # MediaMTX — RTSP to WebRTC/HLS Gateway
+  # ─────────────────────────────────────────
+  mediamtx:
+    image: bluenviron/mediamtx:latest
+    container_name: smartcctv_mediamtx
+    ports:
+      - "8554:8554"   # RTSP server
+      - "8889:8889"   # WebRTC (browser player)
+      - "8888:8888"   # HLS fallback
+    volumes:
+      - ./mediamtx/mediamtx.yml:/mediamtx.yml:ro
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────
+  # ASP.NET MVC 5 Frontend (BFF)
+  # ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: smartcctv_frontend
+    environment:
+      FASTAPI_BASE_URL: "http://backend:8000"
+      DEMO_LIVE_BASE_URL: "http://demo-live:8010"
+    ports:
+      - "127.0.0.1:8086:8080"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # HLS demo inference only: no DB writes, no physical RTSP camera workers.
+  demo-live:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.demo
+    container_name: smartcctv_demo_live
+    environment:
+      DETECTION_PERSIST_ENABLED: "${DETECTION_PERSIST_ENABLED:-true}"
+      DETECTION_INGEST_URL: "http://backend:8000/api/v1/internal/detection-events"
+      DETECTION_INGEST_TOKEN: "${DETECTION_INGEST_TOKEN:?Set DETECTION_INGEST_TOKEN in .env}"
+      DETECTION_OUTBOX_DIR: "/app/storage/detection-outbox"
+      CCTV_1_URL: "${CCTV_1_URL:-https://cctv.jogjaprov.go.id/cctv-proxy/cctv-uptmalioboro/streams/UPTMalio_NolKm_Timur.stream.m3u8}"
+      CCTV_1_NAME: "${CCTV_1_NAME:-Nol Kilometer Timur}"
+      CCTV_2_URL: "${CCTV_2_URL:-https://cctv.jogjaprov.go.id/cctv-proxy/cctv-uptmalioboro/streams/UPTMalio_NolKmGedungAgung.stream.m3u8}"
+      CCTV_2_NAME: "${CCTV_2_NAME:-Nol Kilometer Gedung Agung}"
+      CCTV_SAMPLE_SECONDS: "${CCTV_SAMPLE_SECONDS:-2}"
+      CCTV_STALE_SECONDS: "${CCTV_STALE_SECONDS:-30}"
+      CCTV_RECONNECT_SECONDS: "${CCTV_RECONNECT_SECONDS:-5}"
+      CCTV_TIMEOUT_SECONDS: "${CCTV_TIMEOUT_SECONDS:-10}"
+      CCTV_1_VEHICLE_PROFILE: "${CCTV_1_VEHICLE_PROFILE:-}"
+      CCTV_2_VEHICLE_PROFILE: "${CCTV_2_VEHICLE_PROFILE:-}"
+      OPENCV_FFMPEG_CAPTURE_OPTIONS: "rtsp_transport;tcp"
+      OPENCV_LOG_LEVEL: "SILENT"
+      OPENCV_FFMPEG_LOGLEVEL: "-8"
+    volumes:
+      - ./backend/app/ai/weights:/app/app/ai/weights:ro
+      - detection_outbox:/app/storage/detection-outbox
+    restart: unless-stopped
+    cpus: 4
+    mem_limit: 4g
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  mssql_data:
+    driver: local
+  snapshot_storage:
+    driver: local
+  detection_outbox:
+    driver: local

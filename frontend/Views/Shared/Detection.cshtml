@@ -1,0 +1,198 @@
+@model MvcSmartCctv.Models.DetectionViewModel
+@{
+    var hasDemo = !string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("DEMO_LIVE_BASE_URL"));
+    System.Uri playerBase;
+    var hasPlayer = System.Uri.TryCreate(System.Environment.GetEnvironmentVariable("CAMERA_PLAYER_BASE_URL"), System.UriKind.Absolute, out playerBase)
+        && playerBase.Scheme == "https" && !playerBase.IsLoopback && string.IsNullOrEmpty(playerBase.UserInfo);
+    var statusBadge = new System.Collections.Generic.Dictionary<string, string> { { "baru", "warning" }, { "diproses", "warning" }, { "selesai", "success" } };
+    var statusLabel = new System.Collections.Generic.Dictionary<string, string> { { "baru", "Baru" }, { "diproses", "Diproses" }, { "selesai", "Selesai" } };
+}
+<div class="page-head">
+  <h2>@Model.PageTitle</h2>
+  <p>@Model.PageDescription</p>
+</div>
+
+<div id="history-counts" class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+  <div class="kpi-tile"><div class="label">@(hasDemo ? "Kamera Dikonfigurasi" : "Kamera Terdaftar")</div><div class="value">@(hasDemo ? 2 : Model.StatCams)</div></div>
+  <div class="kpi-tile"><div class="label">Pelanggaran Hari Ini (UTC)</div><div class="value">@(Model.StatToday.HasValue ? Model.StatToday.Value.ToString() : "Tidak tersedia")</div></div>
+  <div class="kpi-tile"><div class="label">Kasus Terbuka</div><div class="value" style="color:@Model.AccentColor;">@(Model.StatOpen.HasValue ? Model.StatOpen.Value.ToString() : "Tidak tersedia")</div></div>
+</div>
+
+@if (hasDemo)
+{
+  <section class="panel" aria-labelledby="demo-live-title">
+    <div class="panel-head"><h2 id="demo-live-title">CCTV — Inferensi Kamera</h2></div>
+    <div style="padding:16px;">
+      <p style="font-size:0.85rem;color:var(--text-muted);">Sumber HLS/RTSP sesuai konfigurasi operator. Gambar terbaru dianalisis berkala oleh model, bukan video 25 FPS. Keputusan pelanggaran terkonfirmasi disimpan ke riwayat, bukan semua objek terdeteksi. Status penyimpanan dan percobaan ulang ditampilkan terpisah dari inferensi.</p>
+      <p style="font-size:0.85rem;">@(Model.Category == "vehicle" ? "Mode kendaraan mengikuti profil tiap kamera: tanpa kalibrasi hanya deteksi objek; dengan profil valid, aturan pelanggaran dijalankan. Status ditampilkan pada gambar." : "Mode APD: kotak person/PPE dan keputusan model. Aturan coverall tetap berlaku; CCTV jalan raya bukan validasi akurasi APD.")</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;">
+      @for (var cameraId = 1; cameraId <= 2; cameraId++)
+      {
+        <div class="camera-card demo-live-camera" data-status-url="@Url.Action("Status", "Demo", new { id = cameraId })" data-frame-url="@Url.Action("Frame", "Demo", new { id = cameraId, mode = Model.Category })">
+          <div style="background:#111;min-height:180px;">
+            <img class="demo-frame" alt="Menunggu hasil inferensi CCTV @cameraId" style="display:block;width:100%;height:auto;" />
+          </div>
+          <div class="camera-meta">
+            <div class="name demo-name">CCTV @cameraId</div>
+            <p class="demo-source" style="font-size:0.8rem;"></p>
+            <p class="demo-state" role="status" style="font-size:0.8rem;">Menyiapkan model dan koneksi kamera...</p>
+            <p class="demo-storage" role="status" style="font-size:0.8rem;">Penyimpanan: memeriksa antrean...</p>
+            <button type="button" class="demo-pause">Jeda tampilan</button>
+            <button type="button" class="demo-fullscreen">Layar penuh</button>
+          </div>
+        </div>
+      }
+      </div>
+    </div>
+  </section>
+  <script>
+    document.querySelectorAll('.demo-live-camera').forEach(function (card) {
+      var img = card.querySelector('.demo-frame'), state = card.querySelector('.demo-state');
+      var paused = false, suspended = false, timer = null, activeRequest = null;
+      var objectUrl = null, lastSequence = null, lastChange = 0;
+      card.querySelector('.demo-pause').onclick = function () {
+        paused = !paused; this.textContent = paused ? 'Lanjutkan tampilan' : 'Jeda tampilan';
+        if (paused) {
+          if (activeRequest) activeRequest.abort();
+          state.textContent = 'Tampilan dijeda';
+        }
+      };
+      card.querySelector('.demo-fullscreen').onclick = function () { if (card.requestFullscreen) card.requestFullscreen(); };
+      async function refresh() {
+        if (suspended) return;
+        if (paused || document.hidden) { timer = setTimeout(refresh, 1000); return; }
+        var controller = new AbortController(), timeout = setTimeout(function () { controller.abort(); }, 12000);
+        activeRequest = controller;
+        try {
+          var response = await fetch(card.dataset.frameUrl + '&t=' + Date.now(), { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+          if (!response.ok || !(response.headers.get('Content-Type') || '').startsWith('image/jpeg')) throw new Error('not ready');
+          var sequence = response.headers.get('X-Frame-Sequence');
+          if (sequence !== lastSequence) { lastSequence = sequence; lastChange = Date.now(); }
+          var blob = await response.blob();
+          if (paused || suspended || controller.signal.aborted) return;
+          var next = URL.createObjectURL(blob);
+          var previous = objectUrl; objectUrl = next; img.src = next;
+          if (previous) URL.revokeObjectURL(previous);
+          img.style.opacity = '1';
+          var stale = Date.now() - lastChange > 20000;
+          state.textContent = stale ? 'Gambar belum diperbarui — kemungkinan stream terputus' : 'Inferensi aktif · pembaruan ' + new Date().toLocaleTimeString('id-ID');
+        } catch (error) {
+          if (!paused && !suspended) {
+            img.style.opacity = '0.35';
+            state.textContent = 'Stream/model belum siap atau sesi berakhir. Mencoba kembali...';
+          }
+        } finally {
+          clearTimeout(timeout); activeRequest = null;
+          if (!suspended) timer = setTimeout(refresh, 2000);
+        }
+      }
+      var storage = card.querySelector('.demo-storage'), statusBusy = false;
+      async function refreshStatus() {
+        if (suspended || document.hidden || statusBusy) return;
+        statusBusy = true;
+        var controller = new AbortController(), timeout = setTimeout(function () { controller.abort(); }, 12000);
+        try {
+          var response = await fetch(card.dataset.statusUrl, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+          if (!response.ok) throw new Error('status');
+          var s = await response.json();
+          card.querySelector('.demo-name').textContent = 'CCTV ' + s.id + ' — ' + s.name;
+          card.querySelector('.demo-source').textContent = s.source_attribution + ' (' + s.source_type + ')';
+          var p = s.persistence;
+          if (!p) storage.textContent = 'Penyimpanan: status belum tersedia; jangan anggap hasil tersimpan.';
+          else if (!p.enabled) storage.textContent = 'Penyimpanan tidak aktif; inferensi bukan bukti tersimpan.';
+          else if (p.enqueue_error || p.last_error || p.quarantined > 0)
+            storage.textContent = 'Penyimpanan perlu perhatian: ' + p.pending + ' tertunda (dicoba ulang), ' + p.quarantined + ' dikarantina. Periksa riwayat untuk hasil terkonfirmasi.';
+          else if (p.pending > 0) storage.textContent = 'Penyimpanan: ' + p.pending + ' menunggu pengiriman / percobaan ulang.';
+          else storage.textContent = 'Penyimpanan aktif; antrean kosong. Pelanggaran tersimpan dapat diperiksa di riwayat.';
+        } catch (error) { storage.textContent = 'Status penyimpanan tidak tersedia; hasil belum dapat dikonfirmasi tersimpan.'; }
+        finally { clearTimeout(timeout); statusBusy = false; }
+      }
+      var storageTimer = setInterval(refreshStatus, 15000);
+      refreshStatus();
+      refresh();
+      window.addEventListener('pagehide', function () {
+        suspended = true; clearTimeout(timer); clearInterval(storageTimer);
+        if (activeRequest) activeRequest.abort();
+      });
+      window.addEventListener('pageshow', function (event) {
+        if (event.persisted) { suspended = false; clearTimeout(timer); refresh(); refreshStatus(); storageTimer = setInterval(refreshStatus, 15000); }
+      });
+    });
+  </script>
+}
+
+@if (!hasDemo)
+{
+<div class="camera-grid">
+  @if (!Model.Cameras.Any())
+  {
+    <div style="color:var(--text-muted);font-size:0.85rem;">Belum ada kamera.</div>
+  }
+  else
+  {
+  foreach (var c in Model.Cameras)
+  {
+    <div class="camera-card" id="cam-@c.Id">
+      <div class="camera-feed" style="position:relative;overflow:hidden;background:#000;">
+      @if (hasPlayer && !string.IsNullOrEmpty(c.StreamPath))
+      {
+        <div class="placeholder"><a href="@(playerBase.AbsoluteUri.TrimEnd('/') + "/" + System.Uri.EscapeDataString(c.StreamPath))" target="_blank" rel="noopener noreferrer">Buka stream kamera</a></div>
+      }
+      else
+      {
+        <span class="live-badge">BELUM DIKONFIGURASI</span>
+        <div class="placeholder"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8l4-3h6l2 3h4a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Belum ada stream</span></div>
+      }
+      </div>
+      <div class="camera-meta"><div class="name">@c.Name</div><div class="loc">@c.Location</div></div>
+    </div>
+  }
+  }
+</div>
+}
+
+<section id="history-list" class="panel">
+  <div class="panel-head"><h2>Riwayat Pelanggaran @(Model.Category == "vehicle" ? "Vehicle" : "APD")</h2><span>Maksimal 100 pelanggaran terbaru</span></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Waktu</th><th>Kamera</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+      @if (!Model.Violations.Any())
+      {
+        <tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Belum ada data</td></tr>
+      }
+      else
+      {
+      foreach (var v in Model.Violations)
+      {
+        <tr class="row-click" style="cursor:pointer;" onclick="document.getElementById('case-modal-@v.Id').style.display='flex';">
+          <td class="mono">@v.CreatedAt.ToString("dd MMM, HH:mm")</td>
+          <td>@v.CameraName</td>
+          <td>
+          @if (v.IsCase)
+          {
+            <span class="badge @(statusBadge.ContainsKey(v.Status) ? statusBadge[v.Status] : "muted")">Kasus &middot; @(statusLabel.ContainsKey(v.Status) ? statusLabel[v.Status] : "Tidak dikenal")</span>
+          }
+          else
+          {
+            <span class="badge muted">Alert</span>
+          }
+          </td>
+          <td><button class="link-btn" onclick="event.stopPropagation();document.getElementById('case-modal-@v.Id').style.display='flex';">Lihat Detail</button>
+          </td>
+        </tr>
+      }
+      }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div id="history-modals">
+@foreach (var v in Model.Violations)
+{
+  @Html.Partial("~/Views/Shared/_CaseModal.cshtml", v)
+}
+
+</div>
+@Html.Partial("~/Views/Shared/_HistoryRefresh.cshtml")

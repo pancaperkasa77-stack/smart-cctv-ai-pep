@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+storage/snapshots/
+storage/test-videos/
+storage/test-results/
+app/ai/weights/*
+!app/ai/weights/README.md

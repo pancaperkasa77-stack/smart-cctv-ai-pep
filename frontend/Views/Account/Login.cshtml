@@ -1,0 +1,116 @@
+@{
+    // Layout=null, standalone page — ported visually from the real app's
+    // custom Keycloak login theme (infra/keycloak/themes/pertaminaep/login/
+    // template.ftl + login.css: split hero/panel layout, same colors).
+    // This app has no real Keycloak/backend, so this just posts to
+    // AccountController.Login and sets Session["User"] on success.
+    Layout = null;
+}
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Masuk — Smart CCTV AI</title>
+<link rel="icon" href="@Url.Content("~/Content/pertamina-ep-logo.jpg")" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap">
+<style>
+  *{ box-sizing:border-box; }
+  body{ margin:0; font-family:"Inter",Helvetica,Arial,sans-serif; background:#ffffff; }
+  .vg-split{ display:flex; min-height:100vh; }
+
+  .vg-hero{ flex:1 1 48%; position:relative; overflow:hidden; display:flex; align-items:center; padding:4.5rem 4rem; background:#F3F9EE; }
+  .vg-hero-inner{ max-width:26rem; }
+  .vg-hero-logo{ margin-bottom:3.5rem; }
+  .vg-logo{ height:132px; width:auto; display:block; }
+  .vg-hero-title{ font-size:2.1rem; font-weight:700; line-height:1.25; color:#171A1D; margin:0 0 0.9rem; }
+  .vg-hero-sub{ font-size:1rem; line-height:1.65; color:#61686F; margin:0; max-width:24rem; }
+
+  .vg-panel{ flex:1 1 52%; background:#ffffff; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:3rem 2rem; }
+  .vg-panel-inner{ width:100%; max-width:380px; }
+  .vg-panel-footer{ width:100%; max-width:380px; margin-top:2.5rem; display:flex; gap:0.5rem; font-size:0.78rem; color:#9AA1A9; }
+
+  @@media (max-width:860px){ .vg-hero{ display:none; } .vg-panel{ flex:1 1 100%; } }
+
+  .kc-page-title{ color:#171A1D; font-size:1.4rem; font-weight:700; margin:0 0 1.4rem; }
+  .form-group{ margin-bottom:1.1rem; }
+  .form-group label{ display:block; color:#171A1D; font-size:0.85rem; font-weight:600; margin-bottom:0.4rem; }
+  .form-control{ width:100%; background:#ffffff; border:1px solid #DEE2E6; color:#171A1D; border-radius:8px; padding:0.65rem 0.85rem; font-size:0.92rem; font-family:inherit; }
+  .form-control:focus{ outline:none; border-color:#E4032E; box-shadow:0 0 0 3px rgba(228,3,46,0.12); }
+  .btn-login{ width:100%; margin-top:0.3rem; background-color:#E4032E; border:none; color:#ffffff; padding:0.8rem 1rem; font-size:1rem; font-weight:700; border-radius:8px; cursor:pointer; }
+  .btn-login:hover{ background-color:#b8021f; }
+  .demo-access{ margin-top:1.5rem; padding:1rem; border:1px solid #DEE2E6; border-radius:8px; background:#F7F9FA; color:#171A1D; }
+  .demo-access h2{ margin:0 0 0.5rem; font-size:1rem; }
+  .demo-access p{ margin:0 0 0.75rem; font-size:0.8rem; line-height:1.5; color:#61686F; }
+  .demo-account{ padding:0.65rem 0; border-top:1px solid #DEE2E6; font-size:0.85rem; line-height:1.6; }
+  .demo-account strong{ display:block; }
+  .demo-account code{ overflow-wrap:anywhere; }
+  .demo-account span{ display:block; }
+  .alert-error{ background:#F8DADD; border:1px solid rgba(163,0,26,0.3); color:#A3001A; border-radius:8px; padding:0.7rem 0.9rem; margin-bottom:1.1rem; font-size:0.88rem; }
+</style>
+</head>
+<body>
+<div class="vg-split">
+
+  <div class="vg-hero">
+    <div class="vg-hero-inner">
+      <div class="vg-hero-logo">
+        <img class="vg-logo" src="@Url.Content("~/Content/pertamina-ep-logo.jpg")" alt="Pertamina EP" />
+      </div>
+      <h1 class="vg-hero-title">Selamat Datang Kembali</h1>
+      <p class="vg-hero-sub">Masuk untuk memantau seluruh area operasi Anda secara real-time.</p>
+    </div>
+  </div>
+
+  <div class="vg-panel">
+    <div class="vg-panel-inner">
+      <h1 class="kc-page-title">Masuk</h1>
+      @if (ViewBag.Error != null)
+      {
+        <div class="alert-error">@ViewBag.Error</div>
+      }
+      @using (Html.BeginForm("Login", "Account", FormMethod.Post))
+      {
+        <input type="hidden" name="returnUrl" value="@ViewBag.ReturnUrl" />
+        <div class="form-group">
+          <label>Username</label>
+          <input class="form-control" type="text" name="username" value="@ViewBag.Username" autofocus="autofocus" required="required" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input class="form-control" type="password" name="password" required="required" />
+        </div>
+        <button type="submit" class="btn-login">Masuk</button>
+      }
+      <section class="demo-access" aria-labelledby="demo-access-title">
+        <h2 id="demo-access-title">Akun Demo</h2>
+        <p>Gunakan akun berikut untuk mencoba setiap role. Akun dipakai bersama; jangan masukkan data pribadi atau rahasia.</p>
+        <div class="demo-account">
+          <strong>Admin</strong>
+          <span>Username: <code>admin</code></span>
+          <span>Password: <code>busDev123!</code></span>
+        </div>
+        <div class="demo-account">
+          <strong>Supervisor</strong>
+          <span>Username: <code>supervisor1</code></span>
+          <span>Password: <code>busDev123!</code></span>
+        </div>
+        <div class="demo-account">
+          <strong>Operator</strong>
+          <span>Username: <code>operator1</code></span>
+          <span>Password: <code>busDev123!</code></span>
+        </div>
+      </section>
+    </div>
+
+    <div class="vg-panel-footer">
+      <span>Smart CCTV AI</span>
+      <span>&middot;</span>
+      <span>Copyright &copy; @DateTime.Now.Year Pertamina EP. All Rights Reserved</span>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,116 @@
+@using MvcSmartCctv.Helpers
+@model MvcSmartCctv.Models.ReportsViewModel
+@section Styles {
+<style>.chart-label{ font-size:11px; fill:var(--text-muted); font-family:"Inter",sans-serif; }</style>
+}
+<div class="page-head" style="display:flex;align-items:flex-start;justify-content:space-between;">
+  <div>
+    <h2>Laporan &amp; Analitik</h2>
+    <p>Tren pelanggaran tersimpan dan performa penanganan kasus.</p>
+  </div>
+  <div style="display:flex;gap:0.6rem;">
+    <button class="btn-secondary" disabled title="Mockup — tidak ada backend export nyata">Unduh Ringkasan Eksekutif</button>
+    <button class="btn-primary" disabled title="Mockup — tidak ada backend export nyata">Unduh Laporan Detail</button>
+  </div>
+</div>
+
+<form class="filter-row" method="get" action="@Url.Action("Index")">
+  <div class="range-pills">
+    <button type="submit" name="quick" value="7" class="range-pill@(Model.QuickActive == "7" ? " active" : "")" style="border:none;">7 Hari</button>
+    <button type="submit" name="quick" value="30" class="range-pill@(Model.QuickActive == "30" ? " active" : "")" style="border:none;">30 Hari</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:0.5rem;">
+    <span style="font-size:0.82rem;color:var(--text-muted);">Dari</span>
+    <input type="date" name="from" class="date-input" value="@Model.Start.ToString("yyyy-MM-dd")" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+    <span style="font-size:0.82rem;color:var(--text-muted);">s/d</span>
+    <input type="date" name="to" class="date-input" value="@Model.End.ToString("yyyy-MM-dd")" max="@DateTime.Today.ToString("yyyy-MM-dd")" />
+    <button type="submit" class="btn-secondary">Terapkan</button>
+  </div>
+  @if (Model.RangeError != null)
+  {
+    <span style="font-size:0.8rem;color:var(--critical);">@Model.RangeError</span>
+  }
+</form>
+
+@if (Model.RangeError == null)
+{
+  <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr);">
+    <div class="kpi-tile"><div class="label">Total Pelanggaran (@Model.RangeLabel)</div><div class="value">@Model.Total</div></div>
+    <div class="kpi-tile"><div class="label">Rata-rata / Hari</div><div class="value">@Model.AvgPerDay</div></div>
+    <div class="kpi-tile"><div class="label">Dijadikan Kasus</div><div class="value">@Model.CaseTotal</div></div>
+    <div class="kpi-tile"><div class="label">Kasus Selesai</div><div class="value success">@(Model.CompletionRate.HasValue ? Math.Round(Model.CompletionRate.Value * 100) + "%" : "–")</div></div>
+    <div class="kpi-tile"><div class="label">Rata-rata Waktu Penyelesaian</div><div class="value">@(Model.AvgResponseMinutes.HasValue ? Math.Round(Model.AvgResponseMinutes.Value) + " mnt" : "–")</div></div>
+  </div>
+  <p style="font-size:0.78rem; color:var(--text-muted); margin:-1rem 0 1.5rem;">"Total Pelanggaran" = keputusan pelanggaran tersimpan, bukan semua objek hasil deteksi AI. "Dijadikan Kasus", "Kasus Selesai", dan "Rata-rata Waktu Penyelesaian" hanya menghitung pelanggaran yang dipromosikan jadi Case Violation. Durasi penyelesaian dihitung dari waktu pelanggaran sampai kasus selesai, bukan waktu respons petugas.</p>
+
+  <section class="panel" style="padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+    <h2 style="font-size:0.92rem;font-weight:600;margin:0 0 1rem;">Distribusi per Kategori</h2>
+    <div class="split-bar">
+    @if (Model.Total > 0)
+    {
+      <div style="width:@(Model.ApdPct)%;background:#B57712;"></div><div style="width:@(Model.VehiclePct)%;background:#B8021F;"></div>
+    }
+    else
+    {
+      <div style="width:100%;background:var(--surface-2);"></div>
+    }
+    </div>
+    <div class="category-legend">
+      <div class="row">
+        <div class="swatch" style="background:#FBF1DF;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#B57712" stroke-width="1.8"><path d="M4 15.5V15a8 8 0 0 1 16 0v0.5"/><rect x="3" y="15.5" width="18" height="3" rx="1.2"/><path d="M12 6.5v2.2"/></svg></div>
+        <div><div class="title">APD Detection</div><div class="sub"><span class="mono" style="font-weight:700;color:var(--text);">@Model.ApdTotal</span> pelanggaran &middot; @(Model.ApdPct)% dari total</div></div>
+      </div>
+      <div class="row">
+        <div class="swatch" style="background:#FBE3E3;"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#B8021F" stroke-width="1.8"><rect x="2" y="6" width="11" height="10" rx="1"/><path d="M13 10h4l3 3v3h-7z"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg></div>
+        <div><div class="title">Vehicle Violation</div><div class="sub"><span class="mono" style="font-weight:700;color:var(--text);">@Model.VehicleTotal</span> pelanggaran &middot; @(Model.VehiclePct)% dari total</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" style="padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <h2 style="font-size:0.92rem;font-weight:600;margin:0;">Tren Pelanggaran</h2>
+      <div style="display:flex;gap:1.2rem;">
+        <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-muted);"><span style="width:9px;height:9px;border-radius:2px;background:#B57712;display:inline-block;"></span>APD Detection</span>
+        <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-muted);"><span style="width:9px;height:9px;border-radius:2px;background:#B8021F;display:inline-block;"></span>Vehicle Violation</span>
+      </div>
+    </div>
+    <svg viewBox="0 0 900 240" width="100%" style="display:block;overflow:visible;">@ChartHelper.BuildTrendSvg(Model.Daily, true)</svg>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Pelanggaran per Kamera &amp; Lokasi</h2></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Kamera</th><th>Lokasi</th><th>Kategori</th><th style="width:260px;">Jumlah</th></tr></thead>
+        <tbody>
+        @if (!Model.ByCamera.Any())
+        {
+          <tr><td colspan="4" style="text-align:center;color:var(--text-muted);">Belum ada data</td></tr>
+        }
+        else
+        {
+        foreach (var c in Model.ByCamera)
+        {
+          int maxCount = ViewBag.MaxCameraCount;
+          var color = c.Category == "vehicle" ? "#B8021F" : "#B57712";
+          var soft = c.Category == "vehicle" ? "#FBE3E3" : "#FBF1DF";
+          var pct = Math.Max(4, (int)Math.Round(100.0 * c.Count / maxCount));
+          <tr>
+            <td style="font-weight:600;">@c.CameraName</td>
+            <td style="color:var(--text-muted);">@c.Location</td>
+            <td><span class="badge" style="background:@soft;color:@color;">@(c.Category == "vehicle" ? "Vehicle" : "APD")</span></td>
+            <td>
+              <div class="chart-bar-row">
+                <div class="chart-bar-track"><div class="chart-bar-fill" style="width:@(pct)%;background:@color;"></div></div>
+                <span class="mono" style="font-size:0.85rem;font-weight:600;width:1.8rem;text-align:right;">@c.Count</span>
+              </div>
+            </td>
+          </tr>
+        }
+        }
+        </tbody>
+      </table>
+    </div>
+  </section>
+}

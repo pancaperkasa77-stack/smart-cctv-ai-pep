@@ -1,0 +1,61 @@
+@model MvcSmartCctv.Models.CasesViewModel
+@{
+    var statusMeta = new System.Collections.Generic.Dictionary<string, string[]> {
+        { "baru", new[] { "Baru", "muted" } },
+        { "diproses", new[] { "Diproses", "warning" } },
+        { "selesai", new[] { "Selesai", "success" } },
+    };
+    Func<string, bool> isTab = f => Model.ActiveFilter == f;
+}
+<div class="page-head">
+  <h2>Case Violation</h2>
+  <p>Semua kasus pelanggaran lintas kategori — status penanganan &amp; penanggung jawab.</p>
+</div>
+
+<div class="tabs" style="margin-bottom:1.25rem;">
+  <a class="tab@(isTab("all") ? " active" : "")" href="@Url.Action("Index", new { filter = "all" })" style="text-decoration:none;">Semua</a>
+  <a class="tab@(isTab("apd") ? " active" : "")" href="@Url.Action("Index", new { filter = "apd" })" style="text-decoration:none;">APD</a>
+  <a class="tab@(isTab("vehicle") ? " active" : "")" href="@Url.Action("Index", new { filter = "vehicle" })" style="text-decoration:none;">Vehicle</a>
+  <a class="tab@(isTab("open") ? " active" : "")" href="@Url.Action("Index", new { filter = "open" })" style="text-decoration:none;">Kasus Terbuka</a>
+</div>
+
+<section id="history-list" class="panel">
+  <div class="panel-head"><h2>Maksimal 100 kasus terbaru</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Case ID</th><th>Waktu</th><th>Kategori</th><th>Kamera</th><th>Status</th><th>Ditugaskan</th><th></th></tr></thead>
+      <tbody>
+      @if (!Model.Rows.Any())
+      {
+        <tr><td colspan="7" style="text-align:center;color:var(--text-muted);">Belum ada kasus. Buka sebuah alert dari halaman APD/Vehicle Detection lalu klik "Jadikan Kasus Investigasi" untuk mulai melacaknya di sini.</td></tr>
+      }
+      else
+      {
+      foreach (var v in Model.Rows)
+      {
+        var st = statusMeta.ContainsKey(v.Status) ? statusMeta[v.Status] : new[] { "Tidak dikenal", "muted" };
+        var catLabel = v.Category == "vehicle" ? "Vehicle" : "APD";
+        <tr class="row-click" style="cursor:pointer;" onclick="document.getElementById('case-modal-@v.Id').style.display='flex';">
+          <td class="mono" style="font-weight:600;">CASE-@v.Id.ToString("D4")</td>
+          <td class="mono">@v.CreatedAt.ToString("dd MMM, HH:mm")</td>
+          <td>@catLabel</td>
+          <td>@v.CameraName</td>
+          <td><span class="badge @st[1]">@st[0]</span></td>
+          <td style="color:var(--text-muted);">@(v.AssignedTo ?? "Belum ditugaskan")</td>
+          <td><button class="link-btn" onclick="event.stopPropagation();document.getElementById('case-modal-@v.Id').style.display='flex';">Lihat Detail</button></td>
+        </tr>
+      }
+      }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div id="history-modals">
+@foreach (var v in Model.Rows)
+{
+  @Html.Partial("~/Views/Shared/_CaseModal.cshtml", v)
+}
+
+</div>
+@Html.Partial("~/Views/Shared/_HistoryRefresh.cshtml")

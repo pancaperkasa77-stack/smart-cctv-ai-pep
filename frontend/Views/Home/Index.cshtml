@@ -1,0 +1,103 @@
+@using MvcSmartCctv.Helpers
+@model MvcSmartCctv.Models.DashboardViewModel
+@section Styles {
+<style>.chart-label{ font-size:11px; fill:var(--text-muted); font-family:"Inter",sans-serif; }</style>
+}
+<div class="page-head">
+  <h2>Executive Dashboard</h2>
+  <p>Ringkasan pelanggaran tersimpan di seluruh area operasi, bukan semua objek deteksi AI.</p>
+</div>
+
+<div class="kpi-grid">
+  <div class="kpi-tile"><div class="label">Total Kamera</div><div class="value">@Model.TotalCameras</div></div>
+  <div class="kpi-tile"><div class="label">Total Pelanggaran</div><div class="value">@Model.TotalViolations</div></div>
+  <div class="kpi-tile"><div class="label">Kasus Terbuka</div><div class="value" style="color:var(--critical);">@Model.OpenCases</div></div>
+  <div class="kpi-tile"><div class="label">24 Jam Terakhir</div><div class="value">@Model.Last24h</div></div>
+</div>
+
+<div class="category-cards">
+  <div class="category-card">
+    <div class="head">
+      <div class="left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B57712" stroke-width="1.8"><path d="M4 15.5V15a8 8 0 0 1 16 0v0.5"/><rect x="3" y="15.5" width="18" height="3" rx="1.2"/><path d="M12 6.5v2.2"/></svg> APD Detection</div>
+      <a href="@Url.Action("Index", "Apd")" style="font-size:0.8rem;font-weight:600;">Lihat detail &rarr;</a>
+    </div>
+    <div class="nums">
+      <div><div class="n">@Model.ApdCameraCount</div><div class="l">kamera terpantau</div></div>
+      <div><div class="n" style="color:#B57712;">@Model.ApdViolationCount</div><div class="l">pelanggaran tercatat</div></div>
+    </div>
+  </div>
+  <div class="category-card">
+    <div class="head">
+      <div class="left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#B8021F" stroke-width="1.8"><rect x="2" y="6" width="11" height="10" rx="1"/><path d="M13 10h4l3 3v3h-7z"/><circle cx="6.5" cy="18" r="1.8"/><circle cx="17" cy="18" r="1.8"/></svg> Vehicle Violation</div>
+      <a href="@Url.Action("Index", "Vehicle")" style="font-size:0.8rem;font-weight:600;">Lihat detail &rarr;</a>
+    </div>
+    <div class="nums">
+      <div><div class="n">@Model.VehicleCameraCount</div><div class="l">kamera terpantau</div></div>
+      <div><div class="n" style="color:#B8021F;">@Model.VehicleViolationCount</div><div class="l">pelanggaran tercatat</div></div>
+    </div>
+  </div>
+</div>
+
+<section class="panel" style="padding:1.25rem 1.5rem;margin-bottom:1.25rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+    <h2 style="font-size:0.92rem;font-weight:600;margin:0;">Tren Pelanggaran Mingguan</h2>
+    <div style="display:flex;gap:1.2rem;">
+      <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-muted);"><span style="width:9px;height:9px;border-radius:2px;background:#B57712;display:inline-block;"></span>APD Detection</span>
+      <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.78rem;color:var(--text-muted);"><span style="width:9px;height:9px;border-radius:2px;background:#B8021F;display:inline-block;"></span>Vehicle Violation</span>
+    </div>
+  </div>
+  <svg viewBox="0 0 900 200" width="100%" style="display:block;overflow:visible;">@ChartHelper.BuildTrendSvg(Model.Daily, false)</svg>
+</section>
+
+<section class="panel" style="margin-bottom:1.25rem;">
+  <div class="panel-head"><h2>Area dengan Pelanggaran Terbanyak (100 terbaru)</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Kamera</th><th>Lokasi</th><th style="width:180px;">Jumlah</th></tr></thead>
+      <tbody>
+      @if (!Model.TopLocations.Any())
+      {
+        <tr><td colspan="3" style="text-align:center;color:var(--text-muted);">Belum ada data</td></tr>
+      }
+      else
+      {
+      foreach (var r in Model.TopLocations)
+      {
+        var color = r.Category == "vehicle" ? "#B8021F" : "#B57712";
+        var soft = r.Category == "vehicle" ? "#FBE3E3" : "#FBF1DF";
+        <tr>
+          <td style="font-weight:600;">@r.CameraName</td>
+          <td style="color:var(--text-muted);">@r.Location</td>
+          <td><span class="badge" style="background:@soft;color:@color;">@r.Count pelanggaran</span></td>
+        </tr>
+      }
+      }
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Pelanggaran Tersimpan Terbaru</h2>
+    <a href="@Url.Action("Index", "Cases")" style="font-size:0.8rem;font-weight:600;">Lihat semua kasus &rarr;</a>
+  </div>
+  <div class="panel-body" style="padding:0.5rem 1.1rem;">
+    @if (!Model.Feed.Any())
+    {
+      <div class="feed-empty" style="font-size:0.85rem;color:var(--text-muted);padding:1rem 0;">Belum ada pelanggaran.</div>
+    }
+    else
+    {
+    foreach (var evt in Model.Feed)
+    {
+      var sevColor = evt.Severity == "critical" ? "var(--critical)" : "var(--warning)";
+      <div style="display:flex;align-items:center;gap:0.75rem;padding:0.85rem 0;border-bottom:1px solid var(--border);">
+        <span style="width:0.45rem;height:0.45rem;border-radius:50%;flex:none;background:@sevColor;"></span>
+        <div style="flex:1;"><span style="font-weight:600;font-size:0.87rem;">@evt.Label</span><span style="font-size:0.82rem;color:var(--text-muted);"> &middot; @evt.CameraName</span></div>
+        <div class="mono" style="font-size:0.78rem;color:var(--text-muted);">@evt.CreatedAt.ToString("dd MMM, HH:mm")</div>
+      </div>
+    }
+    }
+  </div>
+</section>

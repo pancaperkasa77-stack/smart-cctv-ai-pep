@@ -1,0 +1,44 @@
+Source provenance
+=================
+Adapted from user-supplied apd_detection_16okt_v7.zip, package v7 dated 16 October 2026.
+Reviewed archive members:
+  apd_detection/src/apd/config.py
+  apd_detection/src/apd/model.py
+  apd_detection/src/apd/detector.py
+  apd_detection/src/apd/ppe_rules.py
+  apd_detection/src/apd/tracker.py
+  apd_detection/src/apd/seragam.py
+  apd_detection/src/apd/memori_diam.py
+  apd_detection/src/apd/area_mask.py
+Streaming pipeline adapted from apd_detection/src/apd/pipeline.py, lines 246-500.
+Stationary-object fixtures adapted from apd_detection/tests/test_cli.py, lines 91-141.
+Asset provenance: apd_detection/runs/final/best.pt and apd_detection/models/seragam_v2.npz.
+Original third-party notice: apd_detection/LISENSI_PIHAK_KETIGA.txt.
+
+Original notice attributes detector and uniform classifier to project team; detector
+fine-tunes Regional 4 base prediction.pt (annotation contributor: cctv-ai team), using
+internal Zona 7, Regional 4 and OGT Balongan CCTV. Base model/pretraining licensing
+and fine-tuning annotation licensing are not recorded. Uniform classifier uses OGT
+Balongan person crops. No additional license grant is inferred by this adaptation.
+Dependencies retain their own licenses. Runtime uses existing torch 2.4.1 and
+Transformers 4.57.6, not the archived installer/version set.
+
+Streaming differences
+=====================
+No archive scripts execute. Runtime never loads pickle checkpoints, downloads model
+files, or uses remote code. Local architecture and original class order retained;
+unremapped safetensors keys undergo original legacy-key remapping.
+Uniform asset is mandatory when exemptions enabled; invalid/missing NPZ fails closed,
+without color fallback. Masks belong to individual camera configuration.
+Original detection, masks, assessment, tracking, uniform inheritance/EMA/wearpack
+rejection, optional person filter, uniform hysteresis, static memory, merged-box,
+exemptions, voting, boot uncertainty, worker gate, absence streak ordering retained.
+No future prescan or end-video retrospective revocation: already delivered alerts
+cannot be revoked when later uniform/static evidence appears. Pending retries need
+current person and item evidence and use current frame boxes. Delivery requires ACK.
+Seconds-based expiry uses monotonic time, observation windows count sampled frames.
+Stationary-memory medians retain latest 512 observations rather than entire video.
+Track, history and inherited-uniform buffers are bounded; historical static-memory
+records expire/cap independently of active delivered-event state. Reconnect/reset,
+non-increasing timestamps, long gaps or resolution changes start new sessions.
+Offline/drawing/export settings are explicitly unsupported in streaming API.
