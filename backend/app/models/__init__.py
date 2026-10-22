@@ -6,4 +6,6 @@ from app.models.camera import Camera
 from app.models.violation import Violation
 from app.models.case_note import CaseNote
 
-__all__ = ["User", "Camera", "Violation", "CaseNote"]
+from app.models.playback import PlaybackSettings
+
+__all__ = ["User", "Camera", "Violation", "CaseNote", "PlaybackSettings"]

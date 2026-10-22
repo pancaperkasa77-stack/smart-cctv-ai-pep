@@ -21,21 +21,24 @@
 @if (hasDemo)
 {
   <section class="panel" aria-labelledby="demo-live-title">
-    <div class="panel-head"><h2 id="demo-live-title">CCTV — Inferensi Kamera</h2></div>
+    <div class="panel-head"><h2 id="demo-live-title">CCTV — Tampilan Kamera</h2></div>
     <div style="padding:16px;">
-      <p style="font-size:0.85rem;color:var(--text-muted);">Sumber HLS/RTSP sesuai konfigurasi operator. Gambar terbaru dianalisis berkala oleh model, bukan video 25 FPS. Keputusan pelanggaran terkonfirmasi disimpan ke riwayat, bukan semua objek terdeteksi. Status penyimpanan dan percobaan ulang ditampilkan terpisah dari inferensi.</p>
-      <p style="font-size:0.85rem;">@(Model.Category == "vehicle" ? "Mode kendaraan mengikuti profil tiap kamera: tanpa kalibrasi hanya deteksi objek; dengan profil valid, aturan pelanggaran dijalankan. Status ditampilkan pada gambar." : "Mode APD: kotak person/PPE dan keputusan model. Aturan coverall tetap berlaku; CCTV jalan raya bukan validasi akurasi APD.")</p>
+      <p style="font-size:0.85rem;color:var(--text-muted);">Mode tampilan dipilih Admin di Pengaturan: RAW untuk video asli, Deteksi AI untuk bounding box dengan kecepatan inferensi. Inferensi server tetap berjalan terpisah secara berkala. Keputusan pelanggaran terkonfirmasi disimpan ke riwayat, bukan semua objek terdeteksi. Status video, inferensi, dan penyimpanan ditampilkan terpisah.</p>
+      <p style="font-size:0.85rem;">@(Model.Category == "vehicle" ? "Mode kendaraan mengikuti profil tiap kamera: tanpa kalibrasi hanya deteksi objek; dengan profil valid, aturan pelanggaran dijalankan. Hasil tersimpan dapat diperiksa di riwayat." : "Mode APD: inferensi person/PPE dan keputusan model berjalan di server; anotasi tampil hanya pada mode Deteksi AI. Aturan coverall tetap berlaku; CCTV jalan raya bukan validasi akurasi APD.")</p>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:16px;">
       @for (var cameraId = 1; cameraId <= 2; cameraId++)
       {
-        <div class="camera-card demo-live-camera" data-status-url="@Url.Action("Status", "Demo", new { id = cameraId })" data-frame-url="@Url.Action("Frame", "Demo", new { id = cameraId, mode = Model.Category })">
+        <div class="camera-card demo-live-camera" data-playback-url="@Url.Action("Playback", "Demo")" data-frame-url="@Url.Action("Frame", "Demo", new { id = cameraId, mode = Model.Category })" data-status-url="@Url.Action("Status", "Demo", new { id = cameraId })" data-stream-url="@Url.Action("Stream", "Demo", new { id = cameraId, file = "index.m3u8" })">
           <div style="background:#111;min-height:180px;">
-            <img class="demo-frame" alt="Menunggu hasil inferensi CCTV @cameraId" style="display:block;width:100%;height:auto;" />
+            <video class="demo-video" aria-label="Video RAW CCTV @cameraId" controls autoplay muted playsinline style="display:none;width:100%;aspect-ratio:16/9;background:#111;"></video>
+            <img class="demo-ai-frame" alt="Hasil deteksi AI CCTV @cameraId" style="display:none;width:100%;height:auto;" />
           </div>
           <div class="camera-meta">
             <div class="name demo-name">CCTV @cameraId</div>
             <p class="demo-source" style="font-size:0.8rem;"></p>
-            <p class="demo-state" role="status" style="font-size:0.8rem;">Menyiapkan model dan koneksi kamera...</p>
+            <p class="demo-video-state" role="status" style="font-size:0.8rem;">Video live: memuat...</p>
+            <p class="demo-buffer" style="font-size:0.8rem;">Buffer: menunggu data</p>
+            <p class="demo-state" role="status" style="font-size:0.8rem;">Inferensi server: memeriksa status...</p>
             <p class="demo-storage" role="status" style="font-size:0.8rem;">Penyimpanan: memeriksa antrean...</p>
             <button type="button" class="demo-pause">Jeda tampilan</button>
             <button type="button" class="demo-fullscreen">Layar penuh</button>
@@ -45,80 +48,8 @@
       </div>
     </div>
   </section>
-  <script>
-    document.querySelectorAll('.demo-live-camera').forEach(function (card) {
-      var img = card.querySelector('.demo-frame'), state = card.querySelector('.demo-state');
-      var paused = false, suspended = false, timer = null, activeRequest = null;
-      var objectUrl = null, lastSequence = null, lastChange = 0;
-      card.querySelector('.demo-pause').onclick = function () {
-        paused = !paused; this.textContent = paused ? 'Lanjutkan tampilan' : 'Jeda tampilan';
-        if (paused) {
-          if (activeRequest) activeRequest.abort();
-          state.textContent = 'Tampilan dijeda';
-        }
-      };
-      card.querySelector('.demo-fullscreen').onclick = function () { if (card.requestFullscreen) card.requestFullscreen(); };
-      async function refresh() {
-        if (suspended) return;
-        if (paused || document.hidden) { timer = setTimeout(refresh, 1000); return; }
-        var controller = new AbortController(), timeout = setTimeout(function () { controller.abort(); }, 12000);
-        activeRequest = controller;
-        try {
-          var response = await fetch(card.dataset.frameUrl + '&t=' + Date.now(), { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
-          if (!response.ok || !(response.headers.get('Content-Type') || '').startsWith('image/jpeg')) throw new Error('not ready');
-          var sequence = response.headers.get('X-Frame-Sequence');
-          if (sequence !== lastSequence) { lastSequence = sequence; lastChange = Date.now(); }
-          var blob = await response.blob();
-          if (paused || suspended || controller.signal.aborted) return;
-          var next = URL.createObjectURL(blob);
-          var previous = objectUrl; objectUrl = next; img.src = next;
-          if (previous) URL.revokeObjectURL(previous);
-          img.style.opacity = '1';
-          var stale = Date.now() - lastChange > 20000;
-          state.textContent = stale ? 'Gambar belum diperbarui — kemungkinan stream terputus' : 'Inferensi aktif · pembaruan ' + new Date().toLocaleTimeString('id-ID');
-        } catch (error) {
-          if (!paused && !suspended) {
-            img.style.opacity = '0.35';
-            state.textContent = 'Stream/model belum siap atau sesi berakhir. Mencoba kembali...';
-          }
-        } finally {
-          clearTimeout(timeout); activeRequest = null;
-          if (!suspended) timer = setTimeout(refresh, 2000);
-        }
-      }
-      var storage = card.querySelector('.demo-storage'), statusBusy = false;
-      async function refreshStatus() {
-        if (suspended || document.hidden || statusBusy) return;
-        statusBusy = true;
-        var controller = new AbortController(), timeout = setTimeout(function () { controller.abort(); }, 12000);
-        try {
-          var response = await fetch(card.dataset.statusUrl, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
-          if (!response.ok) throw new Error('status');
-          var s = await response.json();
-          card.querySelector('.demo-name').textContent = 'CCTV ' + s.id + ' — ' + s.name;
-          card.querySelector('.demo-source').textContent = s.source_attribution + ' (' + s.source_type + ')';
-          var p = s.persistence;
-          if (!p) storage.textContent = 'Penyimpanan: status belum tersedia; jangan anggap hasil tersimpan.';
-          else if (!p.enabled) storage.textContent = 'Penyimpanan tidak aktif; inferensi bukan bukti tersimpan.';
-          else if (p.enqueue_error || p.last_error || p.quarantined > 0)
-            storage.textContent = 'Penyimpanan perlu perhatian: ' + p.pending + ' tertunda (dicoba ulang), ' + p.quarantined + ' dikarantina. Periksa riwayat untuk hasil terkonfirmasi.';
-          else if (p.pending > 0) storage.textContent = 'Penyimpanan: ' + p.pending + ' menunggu pengiriman / percobaan ulang.';
-          else storage.textContent = 'Penyimpanan aktif; antrean kosong. Pelanggaran tersimpan dapat diperiksa di riwayat.';
-        } catch (error) { storage.textContent = 'Status penyimpanan tidak tersedia; hasil belum dapat dikonfirmasi tersimpan.'; }
-        finally { clearTimeout(timeout); statusBusy = false; }
-      }
-      var storageTimer = setInterval(refreshStatus, 15000);
-      refreshStatus();
-      refresh();
-      window.addEventListener('pagehide', function () {
-        suspended = true; clearTimeout(timer); clearInterval(storageTimer);
-        if (activeRequest) activeRequest.abort();
-      });
-      window.addEventListener('pageshow', function (event) {
-        if (event.persisted) { suspended = false; clearTimeout(timer); refresh(); refreshStatus(); storageTimer = setInterval(refreshStatus, 15000); }
-      });
-    });
-  </script>
+  <script src="@Url.Content("~/Content/hls.min.js")"></script>
+  <script src="@Url.Content("~/Content/hls-player.js")"></script>
 }
 
 @if (!hasDemo)

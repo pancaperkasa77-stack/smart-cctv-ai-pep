@@ -41,6 +41,7 @@
     <Compile Include="Controllers\ApdController.cs" />
     <Compile Include="Controllers\VehicleController.cs" />
     <Compile Include="Controllers\CasesController.cs" />
+    <Compile Include="Controllers\HistoryController.cs" />
     <Compile Include="Controllers\ReportsController.cs" />
     <Compile Include="Controllers\SettingsController.cs" />
     <Compile Include="Controllers\AdminController.cs" />
@@ -58,6 +59,7 @@
     <Compile Include="Helpers\ChartHelper.cs" />
     <Compile Include="Services\FastApiClient.cs" />
     <Compile Include="Services\RetentionApiClient.cs" />
+    <Compile Include="Services\PlaybackApiClient.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

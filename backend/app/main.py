@@ -15,6 +15,7 @@ from app.api.v1.reports import router as reports_router
 from app.api.v1.violations import router as violations_router
 from app.core.config import settings
 from app.api.v1.retention import router as retention_router
+from app.api.v1.playback import router as playback_router
 from app.services.retention import retention_worker
 
 @asynccontextmanager
@@ -62,6 +63,7 @@ app.mount("/snapshots", StaticFiles(directory=str(snapshot_path)), name="snapsho
 # ── Routers API v1 ────────────────────────────────────────────────────────────
 api_v1 = FastAPI()
 api_v1.include_router(retention_router)
+api_v1.include_router(playback_router)
 api_v1.include_router(ingestion_router)
 api_v1.include_router(auth_router)
 api_v1.include_router(camera_router)

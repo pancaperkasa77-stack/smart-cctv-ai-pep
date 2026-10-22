@@ -1,4 +1,8 @@
 @{
+    var pageController = Convert.ToString(ViewContext.RouteData.Values["controller"]).ToLowerInvariant();
+    var refreshUrl = pageController == "apd" || pageController == "vehicle"
+        ? Url.Action("Detection", "History", new { category = pageController })
+        : pageController == "cases" ? Url.Action("Cases", "History", new { filter = Request.QueryString["filter"] }) : "";
     var message = TempData["CaseMessage"] as string;
     var failed = Convert.ToString(TempData["CaseFailed"]) == "True";
     var reopenId = Convert.ToString(TempData["CaseReopenId"]);
@@ -13,12 +17,15 @@
   {
     <details><summary>Salinan catatan belum tersimpan (ID @reopenId)</summary><p style="white-space:pre-wrap;">@draft</p></details>
   }
-  <button type="button" id="history-refresh" class="btn-secondary">Perbarui riwayat</button>
+  <button type="button" id="history-refresh" class="btn-secondary" data-refresh-url="@refreshUrl">Perbarui riwayat</button>
   <span id="history-refresh-status" role="status">Riwayat diperbarui setiap 15 detik saat tidak ada detail/draf terbuka.</span>
 </div>
 <script>
 (function () {
   var busy = false, stopped = false;
+  var refreshButton = document.getElementById('history-refresh');
+  var refreshUrl = refreshButton.getAttribute('data-refresh-url');
+  if (!refreshUrl) return;
   var status = document.getElementById('history-refresh-status');
   function editing() {
     return Array.prototype.some.call(document.querySelectorAll('#history-modals .modal-overlay'), function (modal) {
@@ -34,13 +41,18 @@
     var controller = new AbortController();
     var timeout = setTimeout(function () { controller.abort(); }, 12000);
     try {
-      var response = await fetch(window.location.href, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+      var response = await fetch(refreshUrl, { credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
       if (!response.ok || response.redirected) throw new Error('refresh');
       var page = new DOMParser().parseFromString(await response.text(), 'text/html');
       var selectors = ['#history-list', '#history-modals'];
       if (document.getElementById('history-counts')) selectors.push('#history-counts');
       if (!selectors.every(function (selector) { return page.querySelector(selector); })) throw new Error('session');
       if (stopped || document.hidden || editing()) return;
+      // Shared modals render Request.RawUrl, which is now the polling endpoint.
+      // Keep post-action redirects on the visible page, including its filter.
+      Array.prototype.forEach.call(page.querySelectorAll('#history-modals input[name="redirectUrl"]'), function (input) {
+        input.value = window.location.pathname + window.location.search;
+      });
       selectors.forEach(function (selector) {
         document.querySelector(selector).replaceWith(page.querySelector(selector));
       });

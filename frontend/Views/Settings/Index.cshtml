@@ -11,6 +11,44 @@ else
 {
   <div class="page-head"><h2>Pengaturan</h2></div>
 
+  <section class="panel" aria-labelledby="playback-title" style="margin-bottom:1.5rem;">
+    <div class="panel-head"><h2 id="playback-title">Mode Pemutaran Global</h2></div>
+    <div style="padding:1rem;">
+      @if (!string.IsNullOrEmpty(ViewBag.PlaybackNotice as string))
+      {
+        <p role="status">@ViewBag.PlaybackNotice</p>
+      }
+      @if (!string.IsNullOrEmpty(ViewBag.PlaybackError as string))
+      {
+        <p role="alert" style="color:var(--critical);">@ViewBag.PlaybackError</p>
+      }
+      <p id="playback-help"><strong>RAW</strong> menampilkan video sumber asli yang lebih lancar tanpa kotak deteksi. <strong>DeteksiAI</strong> menampilkan cuplikan frame hasil sampling dengan kotak deteksi, sehingga gerakan dapat terlihat kurang lancar.</p>
+      <p>Mode awal adalah RAW. Pilihan ini berlaku global untuk tampilan APD dan kendaraan bagi semua pengguna. Mengganti mode hanya mengubah tampilan video, tidak menghentikan deteksi atau penyimpanan data di backend.</p>
+      @if (Model.Playback != null)
+      {
+        <p>Mode tersimpan: <strong>@(Model.Playback.mode == "ai" ? "DeteksiAI" : "RAW")</strong>.</p>
+        using (Html.BeginForm("SavePlayback", "Settings", FormMethod.Post))
+        {
+          @Html.AntiForgeryToken()
+          <input type="hidden" name="version" value="@Model.Playback.version.ToString(System.Globalization.CultureInfo.InvariantCulture)" />
+          <div class="field">
+            <label for="playback-mode">Mode video</label>
+            <select id="playback-mode" name="mode" required aria-describedby="playback-help">
+              <option value="raw" @(Model.Playback.mode == "raw" ? "selected" : "")>RAW</option>
+              <option value="ai" @(Model.Playback.mode == "ai" ? "selected" : "")>DeteksiAI</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-primary">Simpan Mode Pemutaran</button>
+        }
+      }
+      else
+      {
+        <p>Status pemutaran belum tersedia. Perubahan dinonaktifkan sampai status terbaru berhasil dimuat.</p>
+      }
+      <p><a href="@Url.Action("Index", "Settings")">Muat ulang status pemutaran</a></p>
+    </div>
+  </section>
+
   <section class="panel" aria-labelledby="retention-title" style="margin-bottom:1.5rem;">
     <div class="panel-head"><h2 id="retention-title">Retensi Data Pelanggaran</h2></div>
     <div style="padding:1rem;">

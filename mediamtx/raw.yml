@@ -1,0 +1,22 @@
+# Isolated browser relay. Sources injected by Docker environment, never public.
+logLevel: error
+rtsp: no
+rtmp: no
+webrtc: no
+srt: no
+moq: no
+hls: yes
+hlsAddress: :8888
+hlsVariant: mpegts
+hlsSegmentCount: 7
+hlsSegmentDuration: 2s
+hlsAlwaysRemux: no
+paths:
+  cam1:
+    source: publisher
+    sourceOnDemand: yes
+    rtspTransport: tcp
+  cam2:
+    source: publisher
+    sourceOnDemand: yes
+    rtspTransport: tcp

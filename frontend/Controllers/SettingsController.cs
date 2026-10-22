@@ -81,6 +81,35 @@ namespace MvcSmartCctv.Controllers
             return SettingsView(model);
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public ActionResult SavePlayback(string mode = null, string version = null)
+        {
+            if (!CurrentUser.IsAdmin) return new HttpStatusCodeResult(403);
+            long parsedVersion;
+            if (!ModelState.IsValid || (mode != "raw" && mode != "ai") ||
+                !long.TryParse(version, NumberStyles.None, CultureInfo.InvariantCulture, out parsedVersion) || parsedVersion < 0)
+                ViewBag.PlaybackError = "Pilih RAW atau DeteksiAI dengan versi pengaturan yang valid. Muat ulang status sebelum mencoba lagi.";
+            else
+            {
+                try
+                {
+                    PlaybackApiClient.Save(mode, parsedVersion, CurrentUser.AccessToken);
+                    TempData["PlaybackNotice"] = "Mode pemutaran global disimpan. Deteksi dan penyimpanan data di backend tetap berjalan.";
+                    return RedirectToAction("Index");
+                }
+                catch (PlaybackApiException ex) { ViewBag.PlaybackError = ex.Message; }
+            }
+            var model = new RetentionViewModel();
+            LoadSummary(model);
+            if (model.Summary != null)
+            {
+                model.Enabled = model.Summary.enabled;
+                model.MaxRecords = model.Summary.max_records.ToString(CultureInfo.InvariantCulture);
+            }
+            return SettingsView(model);
+        }
+
         private bool ValidateCount(RetentionViewModel model, out int count)
         {
             if (!ModelState.IsValid || !int.TryParse(model.MaxRecords, NumberStyles.None, CultureInfo.InvariantCulture, out count) || count < 1 || count > 1000000)
@@ -109,6 +138,13 @@ namespace MvcSmartCctv.Controllers
             ViewBag.IsAdmin = CurrentUser.IsAdmin;
             if (CurrentUser.IsAdmin)
             {
+                ViewBag.PlaybackNotice = TempData["PlaybackNotice"] as string;
+                try { model.Playback = PlaybackApiClient.Get(CurrentUser.AccessToken); }
+                catch (PlaybackApiException ex)
+                {
+                    var previousError = ViewBag.PlaybackError as string;
+                    ViewBag.PlaybackError = string.IsNullOrEmpty(previousError) ? ex.Message : previousError + " " + ex.Message;
+                }
                 try { model.Cameras = FastApiClient.GetCameras(null, CurrentUser.AccessToken); }
                 catch (Exception) { model.CameraError = "Daftar kamera tidak dapat dimuat."; }
             }

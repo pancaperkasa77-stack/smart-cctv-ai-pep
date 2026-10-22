@@ -10,6 +10,7 @@ namespace MvcSmartCctv.Models
             MaxRecords = "1000";
         }
 
+        public MvcSmartCctv.Services.PlaybackSettings Playback { get; set; }
         public List<Camera> Cameras { get; set; }
         public bool Enabled { get; set; }
         public string MaxRecords { get; set; }

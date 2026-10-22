@@ -77,13 +77,29 @@ services:
     environment:
       FASTAPI_BASE_URL: "http://backend:8000"
       DEMO_LIVE_BASE_URL: "http://demo-live:8010"
+      RAW_STREAM_BASE_URL: "http://raw-stream:8888"
+      CCTV_1_URL: "${CCTV_1_URL:-https://cctv.jogjaprov.go.id/cctv-proxy/cctv-uptmalioboro/streams/UPTMalio_NolKm_Timur.stream.m3u8}"
+      CCTV_2_URL: "${CCTV_2_URL:-https://cctv.jogjaprov.go.id/cctv-proxy/cctv-uptmalioboro/streams/UPTMalio_NolKmGedungAgung.stream.m3u8}"
     ports:
       - "127.0.0.1:8086:8080"
     depends_on:
       - backend
     restart: unless-stopped
 
-  # HLS demo inference only: no DB writes, no physical RTSP camera workers.
+  # Raw browser video relay, independent of model inference speed.
+  raw-stream:
+    image: bluenviron/mediamtx:1.21.0
+    container_name: smartcctv_raw_stream
+    environment:
+      MTX_PATHS_CAM1_SOURCE: "${CCTV_1_URL:-https://cctv.jogjaprov.go.id/cctv-proxy/cctv-uptmalioboro/streams/UPTMalio_NolKm_Timur.stream.m3u8}"
+      MTX_PATHS_CAM2_SOURCE: "${CCTV_2_URL:-https://cctv.jogjaprov.go.id/cctv-proxy/cctv-uptmalioboro/streams/UPTMalio_NolKmGedungAgung.stream.m3u8}"
+    volumes:
+      - ./mediamtx/raw.yml:/mediamtx.yml:ro
+      - /etc/ssl/certs/ca-certificates.crt:/etc/ssl/certs/ca-certificates.crt:ro
+    restart: unless-stopped
+    mem_limit: 512m
+
+  # Server-side inference and durable violation delivery.
   demo-live:
     build:
       context: ./backend
